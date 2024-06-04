@@ -14,8 +14,8 @@ entity adc_dma_packet_controller is
   generic (
     --! Parameter defining the current DMA bandwidth
     --! defines the width of transfer length control register in bits; limits the maximum length 
-    --! of the transfers to 2^DMA_LENGTH_WIDTH (e.g., 2^24 = 16M)
-    DMA_LENGTH_WIDTH	: integer	:= 24    
+    --! of the transfers to 2^PARAM_DMA_LENGTH_WIDTH (e.g., 2^24 = 16M)
+    PARAM_DMA_LENGTH_WIDTH	: integer	:= 24    
   );
   port (
     -- *************************************************************************
@@ -33,7 +33,7 @@ entity adc_dma_packet_controller is
     -- Custom timestamping ports
     -- *************************************************************************
     --! Signal indicating the number of samples comprising the current DMA transfer [@ADCxN_clk]
-    DMA_x_length : in std_logic_vector(DMA_LENGTH_WIDTH-1 downto 0); 
+    DMA_x_length : in std_logic_vector(PARAM_DMA_LENGTH_WIDTH-1 downto 0); 
     DMA_x_length_valid : in std_logic; --! Valid signal for 'DMA_x_length' [@ADCxN_clk]
     --! Signal from DMA core indicating that the new DMA requested 
     --! is being processed and the core is ready to receive new data
@@ -82,11 +82,11 @@ architecture arch_adc_dma_packet_controller_RTL_impl of adc_dma_packet_controlle
   -- **********************************
 
   -- DMA length related constants
-  constant cnt_1_DMA_LENGTH_WIDTHbits : std_logic_vector(DMA_LENGTH_WIDTH-1 downto 0):=(0 => '1', others => '0');
+  constant cnt_1_DMA_LENGTH_WIDTHbits : std_logic_vector(PARAM_DMA_LENGTH_WIDTH-1 downto 0):=(0 => '1', others => '0');
   constant cnt_0_5b : std_logic_vector(4 downto 0):="00000";
   constant cnt_1_5b : std_logic_vector(4 downto 0):="00001";
-  constant cnt_0_16b : std_logic_vector(15 downto 0):=x"0000";
-  constant cnt_1_16b : std_logic_vector(15 downto 0):=x"0001";
+  constant cnt_0_32b : std_logic_vector(31 downto 0):=x"00000000";
+  constant cnt_1_32b : std_logic_vector(31 downto 0):=x"00000001";
 
   -- PS-PL synchronization words
   constant cnt_1st_synchronization_word : std_logic_vector(31 downto 0):=x"bbbbaaaa";
@@ -96,15 +96,15 @@ architecture arch_adc_dma_packet_controller_RTL_impl of adc_dma_packet_controlle
   -- **********************************
 
   -- DMA related signals
-  signal DMA_x_length_int : std_logic_vector(DMA_LENGTH_WIDTH-1 downto 0):=(others => '0');
+  signal DMA_x_length_int : std_logic_vector(PARAM_DMA_LENGTH_WIDTH-1 downto 0):=(others => '0');
   signal DMA_x_length_valid_int : std_logic:='0';
-  signal DMA_x_length_plus1 : std_logic_vector(DMA_LENGTH_WIDTH-1 downto 0);
+  signal DMA_x_length_plus1 : std_logic_vector(PARAM_DMA_LENGTH_WIDTH-1 downto 0);
   signal DMA_x_length_applied : std_logic;
   signal DMA_x_length_valid_count : std_logic_vector(4 downto 0):=(others => '0');
-  signal current_num_samples : std_logic_vector(15 downto 0); -- up to 32768 I/Q samples (i.e., enough for 1 ms @30.72 Msps/20 MHz BW)
-  signal current_num_samples_minus1 : std_logic_vector(15 downto 0);
-  signal num_samples_count : std_logic_vector(15 downto 0);
-  signal samples_to_forward : std_logic_vector(15 downto 0);
+  signal current_num_samples : std_logic_vector(31 downto 0); -- up to 32768 I/Q samples (i.e., enough for 1 ms @30.72 Msps/20 MHz BW)
+  signal current_num_samples_minus1 : std_logic_vector(31 downto 0);
+  signal num_samples_count : std_logic_vector(31 downto 0);
+  signal samples_to_forward : std_logic_vector(31 downto 0);
   signal processing_new_packet : std_logic := '0';
   signal discard_adc_samples : std_logic := '0';
   signal fifo_xfer_req_d : std_logic := '0';
@@ -208,7 +208,7 @@ begin
   DMA_x_length_plus1 <= DMA_x_length_int + cnt_1_DMA_LENGTH_WIDTHbits;
 
   -- concurrent calculation of the control-index
-  current_num_samples_minus1 <= current_num_samples - cnt_1_16b;
+  current_num_samples_minus1 <= current_num_samples - cnt_1_32b;
 
   -- process forwarding the packet-aligned input data
   process(ADCxN_clk,ADCxN_reset)
@@ -246,13 +246,13 @@ begin
         -- 1st forwarded DMA-packet sample: we will update the internal control signals; we'll make sure that we are aligned with the incoming DMA packets structure)
         if (adc_valid_0 = '1' or adc_valid_1 = '1' or adc_valid_2 = '1' or adc_valid_3 = '1') and
            adc_data_0 = cnt_1st_synchronization_word(15 downto 0) and adc_data_1 = cnt_1st_synchronization_word(31 downto 16) and
-           num_samples_count = cnt_0_16b and (DMA_x_length_valid_int = '1' or DMA_x_length_valid_count > cnt_0_5b) and discard_adc_samples = '0' then
+           num_samples_count = cnt_0_32b and (DMA_x_length_valid_int = '1' or DMA_x_length_valid_count > cnt_0_5b) and discard_adc_samples = '0' then
           -- we will now convert the DMA's 'x_length' parameter to the current number of samples comprising the I/Q frame + one 64-bit timestamp (+2 32-bit values), as follows:
           --
           --  + x_length = N, where N = M-1 + 32 = M + 31, where M is the number of I/Q-data bytes being forwarded by the DMA
           --  + num_samples = (M+1)/4, since each sample comprises one 16-bit I value and one 16-bit Q value (i.e., 4 bytes)
           --  + num_samples (incl. timestamp) = (x_length + 1)/4, where the division is implemented as a 2-position shift to the right
-          current_num_samples <= DMA_x_length_plus1(17 downto 2); -- @TO_BE_TESTED: validate we are always obtaining a meaningful value
+          current_num_samples <= (31 downto PARAM_DMA_LENGTH_WIDTH - 2 => '0') & DMA_x_length_plus1(PARAM_DMA_LENGTH_WIDTH-1 downto 2); -- @TO_BE_TESTED: validate we are always obtaining a meaningful value
 
           -- actual data forwarding
           -- fwd_adc_enable_0_s <= adc_enable_0;
@@ -270,13 +270,13 @@ begin
           -- fwd_adc_overflow_s <= adc_overflow;
 
           -- control counter update
-          num_samples_count <= num_samples_count + cnt_1_16b;
+          num_samples_count <= num_samples_count + cnt_1_32b;
 
           -- notify that we have currently applied a new DMA_x_length and update the internal 'select' signal
           DMA_x_length_applied <= '1';
           processing_new_packet <= '1';
         -- rest of forwarded DMA-packet samples: we will use the internally stored muxing configuration
-        elsif num_samples_count > cnt_0_16b and discard_adc_samples = '0' then
+        elsif num_samples_count > cnt_0_32b and discard_adc_samples = '0' then
           -- actual data forwarding
           -- fwd_adc_enable_0_s <= adc_enable_0;
           fwd_adc_valid_0_s <= adc_valid_0;
@@ -299,7 +299,7 @@ begin
             if num_samples_count = current_num_samples_minus1 then
               num_samples_count <= (others => '0');
             else
-              num_samples_count <= num_samples_count + cnt_1_16b;
+              num_samples_count <= num_samples_count + cnt_1_32b;
             end if;
           end if;
         -- either 'x_length' was not properly updated... we will dismiss the samples until it is configured back again

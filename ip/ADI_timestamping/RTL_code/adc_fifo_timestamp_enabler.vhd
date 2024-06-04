@@ -104,7 +104,7 @@ entity adc_fifo_timestamp_enabler is
 
     --! Debug-only output port.
     --! Forwarding of 'current_num_samples' for debugging reasons.
-    current_num_samples_o : out std_logic_vector(15 downto 0); 
+    current_num_samples_o : out std_logic_vector(31 downto 0); 
 
     -- forwarded util_ad9361_adc_fifo inputs
     fwd_adc_enable_0 : out std_logic;                   --! Enable signal for ADC data port 0.
@@ -167,21 +167,23 @@ architecture arch_adc_fifo_timestamp_enabler_RTL_impl of adc_fifo_timestamp_enab
   constant cnt_1_5b : std_logic_vector(4 downto 0):="00001";
   constant cnt_0_16b : std_logic_vector(15 downto 0):=x"0000";
   constant cnt_1_16b : std_logic_vector(15 downto 0):=x"0001";
-  constant cnt_2_16b : std_logic_vector(15 downto 0):=x"0002";
-  constant cnt_3_16b : std_logic_vector(15 downto 0):=x"0003";
-  constant cnt_4_16b : std_logic_vector(15 downto 0):=x"0004";
-  constant cnt_5_16b : std_logic_vector(15 downto 0):=x"0005";
-  constant cnt_6_16b : std_logic_vector(15 downto 0):=x"0006";
-  constant cnt_7_16b : std_logic_vector(15 downto 0):=x"0007";
-  constant cnt_8_16b : std_logic_vector(15 downto 0):=x"0008";
-  constant cnt_9_16b : std_logic_vector(15 downto 0):=x"0009";
-  constant cnt_10_16b : std_logic_vector(15 downto 0):=x"000A";
-  constant cnt_11_16b : std_logic_vector(15 downto 0):=x"000B";
-  constant cnt_12_16b : std_logic_vector(15 downto 0):=x"000C";
-  constant cnt_13_16b : std_logic_vector(15 downto 0):=x"000D";
-  constant cnt_14_16b : std_logic_vector(15 downto 0):=x"000E";
-  constant cnt_15_16b : std_logic_vector(15 downto 0):=x"000F";
-  constant cnt_16_16b : std_logic_vector(15 downto 0):=x"0010";
+  constant cnt_0_32b  : std_logic_vector(31 downto 0) := x"00000000";
+  constant cnt_1_32b  : std_logic_vector(31 downto 0) := x"00000001";
+  constant cnt_2_32b  : std_logic_vector(31 downto 0) := x"00000002";
+  constant cnt_3_32b  : std_logic_vector(31 downto 0) := x"00000003";
+  constant cnt_4_32b  : std_logic_vector(31 downto 0) := x"00000004";
+  constant cnt_5_32b  : std_logic_vector(31 downto 0) := x"00000005";
+  constant cnt_6_32b  : std_logic_vector(31 downto 0) := x"00000006";
+  constant cnt_7_32b  : std_logic_vector(31 downto 0) := x"00000007";
+  constant cnt_8_32b  : std_logic_vector(31 downto 0) := x"00000008";
+  constant cnt_9_32b  : std_logic_vector(31 downto 0) := x"00000009";
+  constant cnt_10_32b : std_logic_vector(31 downto 0) := x"0000000A";
+  constant cnt_11_32b : std_logic_vector(31 downto 0) := x"0000000B";
+  constant cnt_12_32b : std_logic_vector(31 downto 0) := x"0000000C";
+  constant cnt_13_32b : std_logic_vector(31 downto 0) := x"0000000D";
+  constant cnt_14_32b : std_logic_vector(31 downto 0) := x"0000000E";
+  constant cnt_15_32b : std_logic_vector(31 downto 0) := x"0000000F";
+  constant cnt_16_32b : std_logic_vector(31 downto 0) := x"00000010";
   constant cnt_1_64b : std_logic_vector(63 downto 0):=x"0000000000000001";
 
   -- **********************************
@@ -258,9 +260,9 @@ architecture arch_adc_fifo_timestamp_enabler_RTL_impl of adc_fifo_timestamp_enab
   signal DMA_x_length_int : std_logic_vector(PARAM_DMA_LENGTH_WIDTH-1 downto 0):=(others => '0');
   signal DMA_x_length_valid_int : std_logic:='0';
   signal DMA_x_length_plus1 : std_logic_vector(PARAM_DMA_LENGTH_WIDTH-1 downto 0);
-  signal current_num_samples : std_logic_vector(15 downto 0); -- up to 1920 I/Q samples (i.e., 1 ms for 1.92 Msps/1.4 MHz BW)
-  signal current_num_samples_minus1 : std_logic_vector(15 downto 0);
-  signal num_samples_count : std_logic_vector(15 downto 0);
+  signal current_num_samples : std_logic_vector(31 downto 0); -- up to 1920 I/Q samples (i.e., 1 ms for 1.92 Msps/1.4 MHz BW)
+  signal current_num_samples_minus1 : std_logic_vector(31 downto 0);
+  signal num_samples_count : std_logic_vector(31 downto 0);
   signal current_lclk_count_int : std_logic_vector(63 downto 0):=(others => '0');
   signal current_lclk_count_int_i : std_logic_vector(63 downto 0):=(others => '0');
   signal DMA_x_length_valid_count : std_logic_vector(4 downto 0):=(others => '0');
@@ -375,7 +377,7 @@ begin
   end process;
 
   -- concurrent calculation of the control-index
-  current_num_samples_minus1 <= current_num_samples - cnt_1_16b;
+  current_num_samples_minus1 <= current_num_samples - cnt_1_32b;
 
 -- ** FPGA/sampling clock with a x2 ratio: forwarded outputs will be @ADCxN_clk **
 default_output_processing : if (not PARAM_x1_FPGA_SAMPLING_RATIO) generate
@@ -533,13 +535,13 @@ default_output_processing : if (not PARAM_x1_FPGA_SAMPLING_RATIO) generate
         --  + I/Q data: N-8 32-bit words [16-bit I & 16-bit Q]
 
         -- 1st synchronization header sample insertion; we will start the packetization procedure when there is new adc data to be forwarded and a valid 'x_length' configuration has been passed to the DMA
-        if (adc_valid_0 = '1' or adc_valid_1 = '1') and num_samples_count = cnt_0_16b and (DMA_x_length_valid_int = '1' or DMA_x_length_valid_count > cnt_0_5b) then
+        if (adc_valid_0 = '1' or adc_valid_1 = '1') and num_samples_count = cnt_0_32b and (DMA_x_length_valid_int = '1' or DMA_x_length_valid_count > cnt_0_5b) then
           -- we will now convert the DMA's 'x_length' parameter to the current number of samples comprising the I/Q frame + one 64-bit timestamp (+2 32-bit values), as follows:
           --
           --  + x_length = N, where N = M-1 + 32 = M + 31, where M is the number of I/Q-data bytes being forwarded by the DMA
           --  + num_samples = (M+1)/4, since each sample comprises one 16-bit I value and one 16-bit Q value (i.e., 4 bytes)
           --  + num_samples (incl. timestamp) = (x_length + 1)/4, where the division is implemented as a 2-position shift to the right
-          current_num_samples <= DMA_x_length_plus1(17 downto 2); -- @TO_BE_TESTED: validate we are always obtaining a meaningful value
+          current_num_samples <= (31 downto PARAM_DMA_LENGTH_WIDTH - 2 => '0') & DMA_x_length_plus1(PARAM_DMA_LENGTH_WIDTH-1 downto 2); -- @TO_BE_TESTED: validate we are always obtaining a meaningful value
 
           r0_sync <= '1';
 
@@ -552,7 +554,7 @@ default_output_processing : if (not PARAM_x1_FPGA_SAMPLING_RATIO) generate
           fwd_adc_valid_3_s <= '0'; -- during header insertion we want to make sure that data on channel 4 is not accounted as valid
 
           -- control counter update
-          num_samples_count <= num_samples_count + cnt_1_16b;
+          num_samples_count <= num_samples_count + cnt_1_32b;
 
           -- notify that we have currently applied a new DMA_x_length
           DMA_x_length_applied <= '1';
@@ -569,7 +571,7 @@ default_output_processing : if (not PARAM_x1_FPGA_SAMPLING_RATIO) generate
           -- *DEBUG DATA* control FSM is in its 1st sate
           ADC_FSM_status_s(4 downto 0) <= "00001";
         -- 2nd synchronization header sample insertion
-        elsif num_samples_count = cnt_1_16b then
+        elsif num_samples_count = cnt_1_32b then
           -- the second IQ-frame sample will be the 2nd synchronization word (MSBs on ADC channel 1, LSBs on ADC channel 0)
           fwd_adc_data_0_s <= cnt_2nd_synchronization_word(15 downto 0);
           fwd_adc_valid_0_s <= '1';
@@ -579,12 +581,12 @@ default_output_processing : if (not PARAM_x1_FPGA_SAMPLING_RATIO) generate
           fwd_adc_valid_3_s <= '0'; -- during header insertion we want to make sure that data on channel 4 is not accounted as valid
 
           -- control counter update
-          num_samples_count <= num_samples_count + cnt_1_16b;
+          num_samples_count <= num_samples_count + cnt_1_32b;
 
           -- *DEBUG DATA* control FSM is in its 2nd sate
           ADC_FSM_status_s(4 downto 0) <= "00010";
         -- 3rd synchronization header sample insertion
-        elsif num_samples_count = cnt_2_16b then
+        elsif num_samples_count = cnt_2_32b then
           -- the third IQ-frame sample will be the 3rd synchronization word (MSBs on ADC channel 1, LSBs on ADC channel 0)
           fwd_adc_data_0_s <= cnt_3rd_synchronization_word(15 downto 0);
           fwd_adc_valid_0_s <= '1';
@@ -594,12 +596,12 @@ default_output_processing : if (not PARAM_x1_FPGA_SAMPLING_RATIO) generate
           fwd_adc_valid_3_s <= '0'; -- during header insertion we want to make sure that data on channel 4 is not accounted as valid
 
           -- control counter update
-          num_samples_count <= num_samples_count + cnt_1_16b;
+          num_samples_count <= num_samples_count + cnt_1_32b;
 
           -- *DEBUG DATA* control FSM is in its 3rd sate
           ADC_FSM_status_s(4 downto 0) <= "00011";
         -- 4th synchronization header sample insertion
-        elsif num_samples_count = cnt_3_16b then
+        elsif num_samples_count = cnt_3_32b then
           -- the fourth IQ-frame sample will be the 4th synchronization word (MSBs on ADC channel 1, LSBs on ADC channel 0)
           fwd_adc_data_0_s <= cnt_4th_synchronization_word(15 downto 0);
           fwd_adc_valid_0_s <= '1';
@@ -609,12 +611,12 @@ default_output_processing : if (not PARAM_x1_FPGA_SAMPLING_RATIO) generate
           fwd_adc_valid_3_s <= '0'; -- during header insertion we want to make sure that data on channel 4 is not accounted as valid
 
           -- control counter update
-          num_samples_count <= num_samples_count + cnt_1_16b;
+          num_samples_count <= num_samples_count + cnt_1_32b;
 
           -- *DEBUG DATA* control FSM is in its 4th sate
           ADC_FSM_status_s(4 downto 0) <= "00100";
         -- 5th synchronization header sample insertion
-        elsif num_samples_count = cnt_4_16b then
+        elsif num_samples_count = cnt_4_32b then
           -- the fifth IQ-frame sample will be the 5th synchronization word (MSBs on ADC channel 1, LSBs on ADC channel 0)
           fwd_adc_data_0_s <= cnt_5th_synchronization_word(15 downto 0);
           fwd_adc_valid_0_s <= '1';
@@ -624,12 +626,12 @@ default_output_processing : if (not PARAM_x1_FPGA_SAMPLING_RATIO) generate
           fwd_adc_valid_3_s <= '0'; -- during header insertion we want to make sure that data on channel 4 is not accounted as valid
 
           -- control counter update
-          num_samples_count <= num_samples_count + cnt_1_16b;
+          num_samples_count <= num_samples_count + cnt_1_32b;
 
           -- *DEBUG DATA* control FSM is in its 5th sate
           ADC_FSM_status_s(4 downto 0) <= "00101";
         -- 6th synchronization header sample insertion
-        elsif num_samples_count = cnt_5_16b then
+        elsif num_samples_count = cnt_5_32b then
           -- the sixth IQ-frame sample will be the 6th synchronization word (MSBs on ADC channel 1, LSBs on ADC channel 0)
           fwd_adc_data_0_s <= cnt_6th_synchronization_word(15 downto 0);
           fwd_adc_valid_0_s <= '1';
@@ -639,12 +641,12 @@ default_output_processing : if (not PARAM_x1_FPGA_SAMPLING_RATIO) generate
           fwd_adc_valid_3_s <= '0'; -- during header insertion we want to make sure that data on channel 4 is not accounted as valid
 
           -- control counter update
-          num_samples_count <= num_samples_count + cnt_1_16b;
+          num_samples_count <= num_samples_count + cnt_1_32b;
 
           -- *DEBUG DATA* control FSM is in its 6th sate
           ADC_FSM_status_s(4 downto 0) <= "00110";
         -- LSBs timestamp insertion (7th synchronization header sample)
-        elsif num_samples_count = cnt_6_16b then
+        elsif num_samples_count = cnt_6_32b then
           -- the seventh IQ-frame sample will be the timestamp's LSBs
           fwd_adc_data_0_s <= current_lclk_count_int(15 downto 0);
           fwd_adc_valid_0_s <= '1';
@@ -654,12 +656,12 @@ default_output_processing : if (not PARAM_x1_FPGA_SAMPLING_RATIO) generate
           fwd_adc_valid_3_s <= '0'; -- @TO_BE_TESTED: during timestamping we want to make sure that data on channel 4 is not accounted as valid
 
           -- control counter update
-          num_samples_count <= num_samples_count + cnt_1_16b;
+          num_samples_count <= num_samples_count + cnt_1_32b;
 
           -- *DEBUG DATA* control FSM is in its 7th sate
           ADC_FSM_status_s(4 downto 0) <= "00111";
         -- MSBs timestamp insertion (8th synchronization header sample)
-        elsif num_samples_count = cnt_7_16b then
+        elsif num_samples_count = cnt_7_32b then
           -- the eighth IQ-frame sample will be the timestamp's MSBs
           fwd_adc_data_0_s <= current_lclk_count_int_i(47 downto 32);
           fwd_adc_valid_0_s <= '1';
@@ -669,12 +671,12 @@ default_output_processing : if (not PARAM_x1_FPGA_SAMPLING_RATIO) generate
           fwd_adc_valid_3_s <= '0'; -- @TO_BE_TESTED: during timestamping we want to make sure that data on channel 4 is not accounted as valid
 
           -- control counter update
-          num_samples_count <= num_samples_count + cnt_1_16b;
+          num_samples_count <= num_samples_count + cnt_1_32b;
 
           -- *DEBUG DATA* control FSM is in its 8th sate
           ADC_FSM_status_s(4 downto 0) <= "01000";
         -- first current I/Q sample (eight fast clock cycles delayed)
-        elsif num_samples_count = cnt_8_16b then
+        elsif num_samples_count = cnt_8_32b then
           -- forward valid I/Q data
           fwd_adc_data_0_s <= adc_data_0_i_i_i_i_i_i_i_i;
           fwd_adc_valid_0_s <= adc_valid_0_i_i_i_i_i_i_i_i;
@@ -689,12 +691,12 @@ default_output_processing : if (not PARAM_x1_FPGA_SAMPLING_RATIO) generate
           end if;
 
           -- control counter update
-          num_samples_count <= num_samples_count + cnt_1_16b;
+          num_samples_count <= num_samples_count + cnt_1_32b;
 
           -- *DEBUG DATA* control FSM is in its 9th sate
           ADC_FSM_status_s(4 downto 0) <= "01001";
         -- fourth current I/Q sample (seven fast clock cycles delayed)
-        elsif num_samples_count = cnt_9_16b then
+        elsif num_samples_count = cnt_9_32b then
           -- forward valid I/Q data
           fwd_adc_data_0_s <= adc_data_0_i_i_i_i_i_i_i;
           fwd_adc_valid_0_s <= adc_valid_0_i_i_i_i_i_i_i;
@@ -709,12 +711,12 @@ default_output_processing : if (not PARAM_x1_FPGA_SAMPLING_RATIO) generate
           end if;
 
           -- control counter update
-          num_samples_count <= num_samples_count + cnt_1_16b;
+          num_samples_count <= num_samples_count + cnt_1_32b;
 
           -- *DEBUG DATA* control FSM is in its 10th sate
           ADC_FSM_status_s(4 downto 0) <= "01010";
         -- fifth current I/Q sample (six fast clock cycles delayed)
-        elsif num_samples_count = cnt_10_16b then
+        elsif num_samples_count = cnt_10_32b then
           -- forward valid I/Q data
           fwd_adc_data_0_s <= adc_data_0_i_i_i_i_i_i;
           fwd_adc_valid_0_s <= adc_valid_0_i_i_i_i_i_i;
@@ -729,12 +731,12 @@ default_output_processing : if (not PARAM_x1_FPGA_SAMPLING_RATIO) generate
           end if;
 
           -- control counter update
-          num_samples_count <= num_samples_count + cnt_1_16b;
+          num_samples_count <= num_samples_count + cnt_1_32b;
 
           -- *DEBUG DATA* control FSM is in its 11th sate
           ADC_FSM_status_s(4 downto 0) <= "01011";
         -- sixth current I/Q sample (five fast clock cycles delayed)
-        elsif num_samples_count = cnt_11_16b then
+        elsif num_samples_count = cnt_11_32b then
           -- forward valid I/Q data
           fwd_adc_data_0_s <= adc_data_0_i_i_i_i_i;
           fwd_adc_valid_0_s <= adc_valid_0_i_i_i_i_i;
@@ -749,12 +751,12 @@ default_output_processing : if (not PARAM_x1_FPGA_SAMPLING_RATIO) generate
           end if;
 
           -- control counter update
-          num_samples_count <= num_samples_count + cnt_1_16b;
+          num_samples_count <= num_samples_count + cnt_1_32b;
 
           -- *DEBUG DATA* control FSM is in its 12th sate
           ADC_FSM_status_s(4 downto 0) <= "01100";
         -- seventh current I/Q sample (four fast clock cycles delayed)
-        elsif num_samples_count = cnt_12_16b then
+        elsif num_samples_count = cnt_12_32b then
           -- forward valid I/Q data
           fwd_adc_data_0_s <= adc_data_0_i_i_i_i;
           fwd_adc_valid_0_s <= adc_valid_0_i_i_i_i;
@@ -769,12 +771,12 @@ default_output_processing : if (not PARAM_x1_FPGA_SAMPLING_RATIO) generate
           end if;
 
           -- control counter update
-          num_samples_count <= num_samples_count + cnt_1_16b;
+          num_samples_count <= num_samples_count + cnt_1_32b;
 
           -- *DEBUG DATA* control FSM is in its 13th sate
           ADC_FSM_status_s(4 downto 0) <= "01101";
         -- eighth current I/Q sample (three fast clock cycles delayed)
-        elsif num_samples_count = cnt_13_16b then
+        elsif num_samples_count = cnt_13_32b then
           -- forward valid I/Q data
           fwd_adc_data_0_s <= adc_data_0_i_i_i;
           fwd_adc_valid_0_s <= adc_valid_0_i_i_i;
@@ -789,12 +791,12 @@ default_output_processing : if (not PARAM_x1_FPGA_SAMPLING_RATIO) generate
           end if;
 
           -- control counter update
-          num_samples_count <= num_samples_count + cnt_1_16b;
+          num_samples_count <= num_samples_count + cnt_1_32b;
 
           -- *DEBUG DATA* control FSM is in its 14th sate
           ADC_FSM_status_s(4 downto 0) <= "01110";
         -- ninth current I/Q sample (two fast clock cycles delayed)
-        elsif num_samples_count = cnt_14_16b then
+        elsif num_samples_count = cnt_14_32b then
           -- forward valid I/Q data
           fwd_adc_data_0_s <= adc_data_0_i_i;
           fwd_adc_valid_0_s <= adc_valid_0_i_i;
@@ -809,12 +811,12 @@ default_output_processing : if (not PARAM_x1_FPGA_SAMPLING_RATIO) generate
           end if;
 
           -- control counter update
-          num_samples_count <= num_samples_count + cnt_1_16b;
+          num_samples_count <= num_samples_count + cnt_1_32b;
 
           -- *DEBUG DATA* control FSM is in its 15th sate
           ADC_FSM_status_s(4 downto 0) <= "01111";
         -- forwarding of remaining I/Q samples (one clock cycle delayed)
-        elsif num_samples_count > cnt_14_16b then
+        elsif num_samples_count > cnt_14_32b then
           -- forward valid I/Q data
           fwd_adc_data_0_s <= adc_data_0_i;
           fwd_adc_valid_0_s <= adc_valid_0_i;
@@ -833,7 +835,7 @@ default_output_processing : if (not PARAM_x1_FPGA_SAMPLING_RATIO) generate
             if num_samples_count = current_num_samples_minus1 then
               num_samples_count <= (others => '0');
             else
-              num_samples_count <= num_samples_count + cnt_1_16b;
+              num_samples_count <= num_samples_count + cnt_1_32b;
             end if;
           end if;
 
@@ -1034,13 +1036,13 @@ CDC_output_processing : if PARAM_x1_FPGA_SAMPLING_RATIO generate
 
         -- 1st synchronization header sample insertion; we will start the packetization procedure when there is new adc data to be forwarded and a valid 'x_length' configuration has been passed to the DMA
         --if (adc_valid_0_AXI = '1' or adc_valid_1_AXI = '1') and num_samples_count = cnt_0_16b and (DMA_x_length_valid_int_AXI = '1' or DMA_x_length_valid_count_AXI > cnt_0_5b) then
-        if adc_valid_0_AXI = '1' and num_samples_count = cnt_0_16b and (DMA_x_length_valid_int_AXI = '1' or DMA_x_length_valid_count_AXI > cnt_0_5b) then
+        if adc_valid_0_AXI = '1' and num_samples_count = cnt_0_32b and (DMA_x_length_valid_int_AXI = '1' or DMA_x_length_valid_count_AXI > cnt_0_5b) then
           -- we will now convert the DMA's 'x_length' parameter to the current number of samples comprising the I/Q frame + one 64-bit timestamp (+2 32-bit values), as follows:
           --
           --  + x_length = N, where N = M-1 + 32 = M + 31, where M is the number of I/Q-data bytes being forwarded by the DMA
           --  + num_samples = (M+1)/4, since each sample comprises one 16-bit I value and one 16-bit Q value (i.e., 4 bytes)
           --  + num_samples (incl. timestamp) = (x_length + 1)/4, where the division is implemented as a 2-position shift to the right
-          current_num_samples <= DMA_x_length_plus1(17 downto 2); -- @TO_BE_TESTED: validate we are always obtaining a meaningful value
+          current_num_samples <= (31 downto PARAM_DMA_LENGTH_WIDTH - 2 => '0') & DMA_x_length_plus1(PARAM_DMA_LENGTH_WIDTH-1 downto 2); -- @TO_BE_TESTED: validate we are always obtaining a meaningful value
 
           -- the first IQ-frame sample will be the 1st synchronization word (MSBs on ADC channel 1, LSBs on ADC channel 0)
           fwd_adc_data_0_s <= cnt_1st_synchronization_word(15 downto 0);
@@ -1051,14 +1053,14 @@ CDC_output_processing : if PARAM_x1_FPGA_SAMPLING_RATIO generate
           fwd_adc_valid_3_s <= '0'; -- during header insertion we want to make sure that data on channel 4 is not accounted as valid
 
           -- control counter update
-          num_samples_count <= num_samples_count + cnt_1_16b;
+          num_samples_count <= num_samples_count + cnt_1_32b;
 
           -- notify that we have currently applied a new DMA_x_length
           DMA_x_length_applied_AXI <= '1';
           overflow_notified_to_PS <= '0';
           first_x_length_received <= '1';
         -- 2nd synchronization header sample insertion
-        elsif num_samples_count = cnt_1_16b then
+        elsif num_samples_count = cnt_1_32b then
           -- the second IQ-frame sample will be the 2nd synchronization word (MSBs on ADC channel 1, LSBs on ADC channel 0)
           fwd_adc_data_0_s <= cnt_2nd_synchronization_word(15 downto 0);
           fwd_adc_valid_0_s <= '1';
@@ -1068,9 +1070,9 @@ CDC_output_processing : if PARAM_x1_FPGA_SAMPLING_RATIO generate
           fwd_adc_valid_3_s <= '0'; -- during header insertion we want to make sure that data on channel 4 is not accounted as valid
 
           -- control counter update
-          num_samples_count <= num_samples_count + cnt_1_16b;
+          num_samples_count <= num_samples_count + cnt_1_32b;
         -- 3rd synchronization header sample insertion
-        elsif num_samples_count = cnt_2_16b then
+        elsif num_samples_count = cnt_2_32b then
           -- the third IQ-frame sample will be the 3rd synchronization word (MSBs on ADC channel 1, LSBs on ADC channel 0)
           fwd_adc_data_0_s <= cnt_3rd_synchronization_word(15 downto 0);
           fwd_adc_valid_0_s <= '1';
@@ -1080,9 +1082,9 @@ CDC_output_processing : if PARAM_x1_FPGA_SAMPLING_RATIO generate
           fwd_adc_valid_3_s <= '0'; -- during header insertion we want to make sure that data on channel 4 is not accounted as valid
 
           -- control counter update
-          num_samples_count <= num_samples_count + cnt_1_16b;
+          num_samples_count <= num_samples_count + cnt_1_32b;
         -- 4th synchronization header sample insertion
-        elsif num_samples_count = cnt_3_16b then
+        elsif num_samples_count = cnt_3_32b then
           -- the fourth IQ-frame sample will be the 4th synchronization word (MSBs on ADC channel 1, LSBs on ADC channel 0)
           fwd_adc_data_0_s <= cnt_4th_synchronization_word(15 downto 0);
           fwd_adc_valid_0_s <= '1';
@@ -1092,9 +1094,9 @@ CDC_output_processing : if PARAM_x1_FPGA_SAMPLING_RATIO generate
           fwd_adc_valid_3_s <= '0'; -- during header insertion we want to make sure that data on channel 4 is not accounted as valid
 
           -- control counter update
-          num_samples_count <= num_samples_count + cnt_1_16b;
+          num_samples_count <= num_samples_count + cnt_1_32b;
         -- 5th synchronization header sample insertion
-        elsif num_samples_count = cnt_4_16b then
+        elsif num_samples_count = cnt_4_32b then
           -- the fifth IQ-frame sample will be the 5th synchronization word (MSBs on ADC channel 1, LSBs on ADC channel 0)
           fwd_adc_data_0_s <= cnt_5th_synchronization_word(15 downto 0);
           fwd_adc_valid_0_s <= '1';
@@ -1104,9 +1106,9 @@ CDC_output_processing : if PARAM_x1_FPGA_SAMPLING_RATIO generate
           fwd_adc_valid_3_s <= '0'; -- during header insertion we want to make sure that data on channel 4 is not accounted as valid
 
           -- control counter update
-          num_samples_count <= num_samples_count + cnt_1_16b;
+          num_samples_count <= num_samples_count + cnt_1_32b;
         -- 6th synchronization header sample insertion
-       elsif num_samples_count = cnt_5_16b then
+       elsif num_samples_count = cnt_5_32b then
             -- the sixth IQ-frame sample will be the 6th synchronization word (MSBs on ADC channel 1, LSBs on ADC channel 0)
             fwd_adc_data_0_s <= cnt_6th_synchronization_word(15 downto 0);
             fwd_adc_valid_0_s <= '1';
@@ -1116,9 +1118,9 @@ CDC_output_processing : if PARAM_x1_FPGA_SAMPLING_RATIO generate
             fwd_adc_valid_3_s <= '0'; -- during header insertion we want to make sure that data on channel 4 is not accounted as valid
 
             -- control counter update
-            num_samples_count <= num_samples_count + cnt_1_16b;
+            num_samples_count <= num_samples_count + cnt_1_32b;
         -- LSBs timestamp insertion (7th synchronization header sample)
-        elsif num_samples_count = cnt_6_16b then
+        elsif num_samples_count = cnt_6_32b then
           -- the seventh IQ-frame sample will be the timestamp's LSBs
           fwd_adc_data_0_s <= current_lclk_count_int(15 downto 0);
           fwd_adc_valid_0_s <= '1';
@@ -1128,9 +1130,9 @@ CDC_output_processing : if PARAM_x1_FPGA_SAMPLING_RATIO generate
           fwd_adc_valid_3_s <= '0'; -- @TO_BE_TESTED: during timestamping we want to make sure that data on channel 4 is not accounted as valid
 
           -- control counter update
-          num_samples_count <= num_samples_count + cnt_1_16b;
+          num_samples_count <= num_samples_count + cnt_1_32b;
         -- MSBs timestamp insertion (8th synchronization header sample)
-        elsif num_samples_count = cnt_7_16b then
+        elsif num_samples_count = cnt_7_32b then
           -- the eighth IQ-frame sample will be the timestamp's MSBs
           fwd_adc_data_0_s <= current_lclk_count_int_i(47 downto 32);
           fwd_adc_valid_0_s <= '1';
@@ -1140,9 +1142,9 @@ CDC_output_processing : if PARAM_x1_FPGA_SAMPLING_RATIO generate
           fwd_adc_valid_3_s <= '0'; -- @TO_BE_TESTED: during timestamping we want to make sure that data on channel 4 is not accounted as valid
 
           -- control counter update
-          num_samples_count <= num_samples_count + cnt_1_16b;
+          num_samples_count <= num_samples_count + cnt_1_32b;
         -- forwarding of actual I/Q samples
-        elsif num_samples_count > cnt_7_16b then
+        elsif num_samples_count > cnt_7_32b then
           -- forward valid I/Q data
           fwd_adc_data_0_s <= adc_data_0_i_i_i_i_i_i_i_i;
           fwd_adc_valid_0_s <= adc_valid_0_i_i_i_i_i_i_i_i;
@@ -1162,11 +1164,11 @@ CDC_output_processing : if PARAM_x1_FPGA_SAMPLING_RATIO generate
             if num_samples_count = current_num_samples_minus1 then
               num_samples_count <= (others => '0');
             else
-              num_samples_count <= num_samples_count + cnt_1_16b;
+              num_samples_count <= num_samples_count + cnt_1_32b;
             end if;
           end if;
         -- 'x_length' was not properly updated... we will dismiss the samples until it is configured back again
-        elsif num_samples_count = cnt_0_16b then
+        elsif num_samples_count = cnt_0_32b then
           fwd_adc_valid_0_s <= '0';
           fwd_adc_valid_1_s <= '0';
           fwd_adc_valid_2_s <= '0';
