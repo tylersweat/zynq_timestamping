@@ -57,7 +57,11 @@ gen-adi-ips:
 	done
 	-cp -r hdl/library $(GEN_REPO)
 
-gen-boot:
+vivado_prj/pluto.runs/impl_1/system_top.bit:
+	export SRS_VIVADO_PATH=/tools/Xilinx/Vivado/2019.2; \
+	./create_project.sh bitstream; \
+
+gen-boot: vivado_prj/pluto.runs/impl_1/system_top.bit
 	@cp vivado_prj/pluto.runs/impl_1/system_top.bit ./bootfiles
 	@touch 	bootfiles/boot.bif
 	@echo "all: {system_top.bit}" >  bootfiles/boot.bif
@@ -76,6 +80,10 @@ reset-board:
 	@sshpass -p $(BOARD_PASS) ssh $(BOARD_USER)@$(BOARD_IP) "echo 7c400000.dma > /sys/bus/platform/drivers/dma-axi-dmac/bind"
 	@sshpass -p $(BOARD_PASS) ssh $(BOARD_USER)@$(BOARD_IP) "echo 79024000.cf-ad9361-dds-core-lpc > /sys/bus/platform/drivers/cf_axi_dds/bind"
 	@sshpass -p $(BOARD_PASS) ssh $(BOARD_USER)@$(BOARD_IP) "echo 79020000.cf-ad9361-lpc > /sys/bus/platform/drivers/cf_axi_adc/bind"
+
+bitstream:
+	export SRS_VIVADO_PATH=/tools/Xilinx/Vivado/2019.2; \
+	./create_project.sh bitstream; \
 
 load-reset:
 	$(MAKE) load-boot
